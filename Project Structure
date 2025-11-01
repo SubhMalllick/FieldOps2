@@ -1,0 +1,11 @@
+fieldops-website/
+├── api/
+│   ├── submit-client.js
+│   └── submit-agent.js
+├── utils/
+│   └── email-handler.js
+├── public/
+│   └── (your static assets)
+├── package.json
+├── vercel.json
+└── index.html
