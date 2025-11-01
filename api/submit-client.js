@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import { sendEmail, formatBusinessEmail } from '../../utils/email-handler.js';
 
 export default async function handler(req, res) {
   // Set CORS headers
@@ -7,7 +7,6 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
 
-  // Handle OPTIONS request for CORS
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -17,88 +16,30 @@ export default async function handler(req, res) {
   }
 
   try {
-    const {
-      companyName,
-      industryType,
-      fullName,
-      phone,
-      email,
-      monthlyNeeds
-    } = req.body;
+    const data = req.body;
 
     // Basic validation
-    if (!companyName || !email || !fullName) {
+    if (!data.companyName || !data.email || !data.fullName) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Missing required fields' 
+        message: 'Missing required fields: Company Name, Email, and Full Name are required.' 
       });
     }
 
-    // Email configuration
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD,
-      },
+    // Format email content
+    const emailContent = formatBusinessEmail(data);
+    
+    // Send email notification
+    await sendEmail({
+      to: process.env.ADMIN_EMAIL || process.env.EMAIL_USER,
+      ...emailContent
     });
 
-    // Prepare email content
-    const emailContent = {
-      to: process.env.ADMIN_EMAIL || process.env.EMAIL_USER,
-      subject: `🚀 New Business Registration: ${companyName}`,
-      text: `
-        NEW BUSINESS REGISTRATION - FIELDOPS
-        ------------------------------------
-        Company Name: ${companyName}
-        Industry Type: ${industryType}
-        Contact Person: ${fullName}
-        Phone: ${phone}
-        Email: ${email}
-        Monthly Verification Needs: ${monthlyNeeds}
-        
-        Submitted: ${new Date().toLocaleString()}
-        IP: ${req.headers['x-forwarded-for'] || req.connection.remoteAddress}
-      `,
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
-                .header { background: linear-gradient(135deg, #2563eb, #1e40af); color: white; padding: 20px; border-radius: 10px 10px 0 0; }
-                .content { background: #f8fafc; padding: 20px; border-radius: 0 0 10px 10px; }
-                .field { margin-bottom: 10px; }
-                .label { font-weight: bold; color: #1e293b; }
-                .footer { color: #64748b; font-size: 12px; margin-top: 20px; }
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <h2>🎉 New Business Registration - FieldOps</h2>
-            </div>
-            <div class="content">
-                <h3 style="color: #1e293b;">Company Details:</h3>
-                <div class="field"><span class="label">Company Name:</span> ${companyName}</div>
-                <div class="field"><span class="label">Industry Type:</span> ${industryType}</div>
-                <div class="field"><span class="label">Contact Person:</span> ${fullName}</div>
-                <div class="field"><span class="label">Phone:</span> ${phone}</div>
-                <div class="field"><span class="label">Email:</span> ${email}</div>
-                <div class="field"><span class="label">Monthly Verification Needs:</span> ${monthlyNeeds}</div>
-            </div>
-            <div class="footer">
-                <p>Submitted: ${new Date().toLocaleString()}</p>
-                <p>IP: ${req.headers['x-forwarded-for'] || req.connection.remoteAddress}</p>
-            </div>
-        </body>
-        </html>
-      `
-    };
-
-    // Send email notification
-    await transporter.sendMail(emailContent);
-
-    console.log('Business registration received:', { companyName, email, phone });
+    console.log('Business registration processed:', { 
+      company: data.companyName, 
+      email: data.email,
+      timestamp: new Date().toISOString()
+    });
 
     return res.status(200).json({ 
       success: true, 
@@ -109,7 +50,7 @@ export default async function handler(req, res) {
     console.error('Error processing business registration:', error);
     return res.status(500).json({ 
       success: false, 
-      message: 'Internal server error. Please try again.' 
+      message: 'Internal server error. Please try again or contact support.' 
     });
   }
 }
